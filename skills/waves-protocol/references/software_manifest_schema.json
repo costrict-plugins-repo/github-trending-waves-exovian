@@ -1,0 +1,245 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Project Manifest Schema",
+  "type": "object",
+  "$comment": "This file describes a software project in a structured format. When a LLM is working to populate this manifest, it should aim to fulfill the semantic purpose of each section and value—not just to provide data, but to convey meaning and intent accurately.",
+  "additionalProperties": false,
+  "required": ["project", "platform_info", "technical_details", "features"],
+
+  "properties": {
+    "project": {
+      "type": "object",
+      "description": "Basic identity and timeline of the project.",
+      "required": ["name", "description", "creation_date", "last_updated"],
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Project or repository name.",
+          "$comment": "Exact name of the project or repository. Should match the root directory or Git name."
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1,
+          "description": "High-level business description of the project.",
+          "$comment": "STOP: ONE business sentence — what the product does and for whom. REDIRECT: architecture, monorepo layout, package lineage, import graph, build tools go in technical_details/platform_info, NOT here. If you name a build tool (Melos/Gradle) or a package, that clause belongs in technical_details. bad→good: Bad: 'Monorepo con Melos que contiene N paquetes, POST-MERGE de app_base...'. Good: 'Panel visual para editar artefactos Waves sin tocar JSON.'"
+        },
+        "creation_date": {
+          "type": "string",
+          "format": "date",
+          "description": "Date when the project was initially created (YYYY-MM-DD).",
+          "$comment": "Date the project was initially created or scaffolded. If unknown, use best estimate."
+        },
+        "last_updated": {
+          "type": "string",
+          "format": "date",
+          "description": "Date of the last meaningful change (YYYY-MM-DD).",
+          "$comment": "Date of the last meaningful change to source code or dependencies. LLMs should use commit history or version bumps."
+        }
+      },
+      "$comment": "Basic identity and timeline of the project. Do not include technical architecture or libraries here."
+    },
+
+    "platform_info": {
+      "type": "object",
+      "description": "Language, framework and environment information.",
+      "additionalProperties": false,
+      "required": ["language", "language_version", "framework", "framework_version", "build_system"],
+      "properties": {
+        "language": {
+          "type": "string",
+          "description": "Primary programming language.",
+          "$comment": "Main programming language used in the project (e.g., Kotlin, Dart, JavaScript). LLMs: look at primary source files."
+        },
+        "language_version": {
+          "type": "string",
+          "description": "Version of the programming language.",
+          "$comment": "Language version explicitly declared in config or inferred from syntax. For Kotlin, check build.gradle.kts. For Dart, use pubspec.yaml."
+        },
+        "framework": {
+          "type": "string",
+          "description": "Core development framework or 'none'.",
+          "$comment": "Core development framework, if any (e.g., Jetpack Compose, Flutter, React). If none applies, use 'none'."
+        },
+        "framework_version": {
+          "type": "string",
+          "description": "Version of the framework.",
+          "$comment": "Version of the framework from dependency declaration (e.g., Flutter 3.22.1, Compose 1.6.7). Use 'unknown' if undetectable."
+        },
+        "build_system": {
+          "type": "string",
+          "description": "Build system name and version.",
+          "$comment": "Name and version of build system (e.g., Gradle 8.5, Bazel, npm). LLMs: look for build config files at project root."
+        }
+      },
+      "$comment": "Describes the language, framework, and environment used to build the project. Essential for compatibility and lifecycle audits."
+    },
+
+    "technical_details": {
+      "type": "object",
+      "description": "Core technical layout and architecture.",
+      "required": ["is_modular_project", "architecture_identified"],
+      "minProperties": 2,
+      "properties": {
+        "is_modular_project": {
+          "type": "boolean",
+          "description": "Whether the project is organized into independent buildable modules.",
+          "$comment": "True if the project is organized into independently compiled modules (e.g., Gradle subprojects, Flutter packages). Folder separation alone is NOT sufficient. LLMs: check for separate build files, module directories, and cross-module dependencies."
+        },
+
+        "modules": {
+          "type": "array",
+          "description": "List of buildable or logical modules.",
+          "items": {
+            "type": "object",
+            "required": ["name", "description"],
+            "properties": {
+              "name": {
+                "type": "string",
+                "description": "Module short identifier.",
+                "$comment": "Short identifier for the module (e.g., 'auth', 'chat_ui'). Prefer lowercase underscore style."
+              },
+              "description": {
+                "type": "string",
+                "description": "Brief technical purpose of the module.",
+                "$comment": "Brief technical purpose of this module (e.g., 'Handles user authentication and session logic')."
+              },
+              "depends_on": {
+                "type": "array",
+                "description": "Module names this one depends on.",
+                "items": { "type": "string" },
+                "default": [],
+                "$comment": "List of other module names this one depends on. Order does not matter."
+              }
+            }
+          },
+          "default": [],
+          "$comment": "List of buildable or logical modules. Only populate if is_modular_project is true. For non-modular project or monoliths, leave empty. The folder separation should be reflected in the architecture_identified object"
+        },
+
+        "architecture_identified": {
+          "type": "array",
+          "description": "Observed architecture patterns by layer.",
+          "items": {
+            "type": "object",
+            "required": ["layer", "pattern"],
+            "properties": {
+              "layer": {
+                "type": "string",
+                "description": "Logical layer name (e.g., presentation, domain, data).",
+                "$comment": "Logical layer name: 'presentation', 'domain', 'data', 'infrastructure', etc. If custom, describe meaning in common_technologies."
+              },
+              "pattern": {
+                "type": "string",
+                "description": "Architecture pattern used in the layer (e.g., MVVM, Clean).",
+                "$comment": "Architecture pattern used in the layer (e.g., MVVM, MVP, Clean, Redux, Hexagonal). If multiple coexist, list all applicable entries."
+              },
+              "common_technologies": {
+                "type": "array",
+                "description": "Libraries or concepts commonly used in the layer.",
+                "items": { "type": "string" },
+                "default": [],
+                "$comment": "STOP/REDIRECT: only SHORT names of libraries, classes or conventions (e.g., ViewModel, StateFlow, UseCase, DAO, Freezed). NO per-file prose, NO descriptions, NO file paths — a name per item, not a sentence."
+              }
+            }
+          },
+          "default": [],
+          "$comment": "Describes distinct architecture patterns observed per layer. AI agents must infer this from code organization, naming, imports and folder structure; do your best without overengineering."
+        }
+      },
+      "$comment": "Core technical layout of the project. This section is used for structural audits and onboarding summaries."
+    },
+
+    "features": {
+      "type": "array",
+      "description": "Main end-user features of the project. Each item is EITHER a short string (canonical shorthand) OR a {name, description} object when a one-line clarification is genuinely needed — both validate.",
+      "items": {
+        "oneOf": [
+          { "type": "string" },
+          {
+            "type": "object",
+            "properties": {
+              "name": { "type": "string", "description": "Short noun-phrase a non-technical person recognizes." },
+              "description": { "type": "string", "description": "One-line clarification of the feature. NOT a changelog or rationale." }
+            },
+            "required": ["name"]
+          }
+        ]
+      },
+      "default": [],
+      "minItems": 1,
+      "$comment": "CANONICAL SHAPE: a string is the default; use the {name, description} object only when a one-line clarification adds real value (this resolves the two-shapes corpus gap — both are now valid, the rich object is no longer an invented variant). STOP: one feature = one short noun-phrase a non-technical person recognizes (<=~60 chars), like 'offline support', 'biometric login'. REDIRECT: FORBIDDEN class/method names, version tags (vX.Y.Z), performance numbers, rationale ('reduced from 20 to 7 because...'), architecture principles — those go in technical_details/architecture_identified, NOT here. If you wrote a ':' followed by an explanation, cut it (or move it to the object's description, kept to ONE line). bad: 'maxMessages reducido de 20 a 7: los datos...'. good: 'Conversación con límite de turnos' (or {name:'Conversación con límite de turnos', description:'El usuario fija el máximo de turnos'}). LLMs: look at main screens, routes and menus."
+    },
+
+    "key_files": {
+      "type": "array",
+      "description": "Optional declared inventory of the most important files/entry points, so authors stop inventing ungoverned 'files'/'path' keys (corpus gap). Each is {path, role}.",
+      "items": {
+        "type": "object",
+        "properties": {
+          "path": { "type": "string", "description": "Repo-relative path of the file." },
+          "role": { "type": "string", "description": "One-line role of this file in the architecture (e.g. 'HTTP entrypoint', 'DI container', 'main router')." }
+        },
+        "required": ["path", "role"]
+      },
+      "default": [],
+      "$comment": "Optional. Officializes the recurring invented files/path keys (corpus pattern P4). STOP: only the genuinely load-bearing files (entry points, routers, DI, config roots) — not every file. REDIRECT: per-feature implementation detail goes in technical_details/architecture_identified, NOT here; this is a navigation index. bad: listing 200 files with multi-paragraph roles. good: {path:'lib/main.dart', role:'app entry point'} for the handful that orient a newcomer."
+    },
+
+    "relations": {
+      "type": "array",
+      "description": "The semantic blast-radius graph: directed edges that say 'a change to X can affect Y' — the couplings grep cannot see because they cross files, layers, or runtime boundaries (e.g. the feature-flags endpoint guards whether the Notifications feature renders).",
+      "items": {
+        "type": "object",
+        "required": ["from", "to", "kind", "why"],
+        "properties": {
+          "from": {
+            "type": "string",
+            "description": "The source component the edge starts at — the one whose change can affect the target.",
+            "$comment": "STOP: name a component that EXISTS elsewhere in this manifest — a module name, a feature, a key_files path, or a layer. REDIRECT: do not invent free-floating labels; the graph is only navigable if from/to resolve to real manifest entries. bad: 'the auth stuff'. good: 'auth' (a declared module) or 'lib/main.dart' (a declared key_file)."
+          },
+          "to": {
+            "type": "string",
+            "description": "The target component the edge points at — the one affected when 'from' changes.",
+            "$comment": "Same discipline as 'from': a real component named elsewhere in the manifest. The edge reads from-kind-to: e.g. 'checkout' consumes 'payment_gateway'."
+          },
+          "kind": {
+            "type": "string",
+            "description": "The edge verb — HOW 'from' relates to 'to'. Open vocabulary; pick the most precise.",
+            "$comment": "Suggested verbs (OPEN — add others when none fit; recurring ones get officialized via the corpus miner): consumes (calls/imports/reads), triggers (causes to run — events, jobs, schedules), guards (gates behavior — a flag/permission/feature-toggle), feeds (produces data the other reads), extends (specializes/overrides). STOP: one lowercase verb, not a sentence — the sentence is 'why'."
+          },
+          "why": {
+            "type": "string",
+            "description": "The one-line reason this edge matters for blast-radius — what breaks or changes in 'to' when 'from' changes.",
+            "$comment": "STOP: the consequence, not a restatement of the verb. This is the WHOLE point of the edge — the thing grep cannot tell you. bad: 'checkout consumes payment_gateway' (just restates from/kind/to). good: 'changing charge()'s signature breaks checkout's retry path'. REDIRECT: no essays — one cause→effect clause."
+          }
+        }
+      },
+      "default": [],
+      "$comment": "OPTIONAL but high-value — the manifest's reason to exist beyond a file tree: a component's blast-radius at a glance, especially when scoping a logbook or diverged_work. STOP: only edges grep CANNOT find — cross-file/cross-layer/runtime couplings (feature↔endpoint↔flag, job↔queue↔handler). REDIRECT: a plain import grep finds in one hop is NOT worth an edge; do not enumerate the whole import graph. Born-compliant (product_rule #13): extra edge fields are allowed (the item is open) — recurring extras are officialization candidates surfaced by the corpus miner."
+    },
+
+    "llm_notes": {
+      "type": "object",
+      "description": "Computed notes and recommendations by the LLM.",
+      "required": ["is_up_to_date"],
+      "properties": {
+        "is_up_to_date": {
+          "type": "boolean",
+          "description": "Whether the core tech stack is up to date.",
+          "$comment": "Set to true if core tech stack is still maintained and has no major deprecation risks. Otherwise false."
+        },
+        "recommended_actions": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": [],
+          "description": "Concise suggestions for updates or future-proofing.",
+          "$comment": "Suggestions for updating or future-proofing the project (e.g., 'Migrate to Kotlin 2.0 coroutines')."
+        }
+      },
+      "default": {},
+      "$comment": "This is a computed section. It may be generated during audits, code reviews or LLM analysis of platform_info."
+    }
+  }
+}
